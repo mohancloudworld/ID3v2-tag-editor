@@ -23,9 +23,9 @@ def usage():
 	print "\t-P <jpeg-file>[,<picture type - integer>[,<description>]]"
 	print "\t-l (optional) to list all TAGs"
 	print	""
-	print "\tNote:\t(1) Always write the data to out.mp3 file, even when just reading the TAGs"
+	print "\tNote:\t(1) Output file name hardcoded to \"out.mp3\""
 	print "\t\t(2) Image is resize to (640,960), to save space"
-	print "\t\t(3) Writes binary data of TAGs (APIC, GEOB, MCDI) into files in local directory"
+	print "\t\t(3) Writes binary data of frames (APIC, GEOB, MCDI) into files in local directory"
 	
 	
 def disp(buf, sz): # For troubleshooting
@@ -86,11 +86,15 @@ def decode_frame(data, id3_ver):
 
 def encode_frame(tag,data, id3_ver, header_flags):
 	data 	= encode_payload(tag,data)
+	frame_flags = chr(0)+chr(0) # all flags: unset
+	#  checking if Unsynchronisation is needed
+	if ord(id3_ver) != 3:
+		unsync_data = unsynchronised(data)
+		if ( len(data) != len(unsync_data)):
+			data = unsync_data
+			# set 'Unsynchronisation', for the frame
+			frame_flags = frame_flags[0] + chr(ord(frame_flags[1]) | 0x02) 
 	sz  	= encode_frame_sz(len(data), id3_ver)
-	frame_flags = chr(0)+chr(0)
-	# Synchronisation
-	if ( (ord(header_flags) & 0x80) != False): 
-		data = unsynchronised(data)
 	frame = tag+sz+frame_flags+data
 	[tag, header_sz, sz, frame_flags, data] = decode_frame(frame, id3_ver)
 	decode_payload(tag, header_flags, frame_flags, data, sz, id3_ver)	
@@ -122,46 +126,26 @@ def decode_text(data,sz):
 		text = data[0:sz].decode('ascii') # ASCII (default)
 	return text
 
-def synchronised(data): # converting 0XFF00 => 0xFF
-	indx = 0
-	out_data = []
-	while indx+1 < len(data) :
-		if (data[indx] == '\xFF') and (data[indx+1] == '\x00'):
-			out_data.append('\xFF') # remove 0x00 and proceed
-			indx += 2
-		else:
-			out_data.append(data[indx]) # copy one byte and proceed
-			indx += 1
-	if (indx < len(data)):
-		out_data.append(data[indx:]) # copy remaining bytes, if any
-	return b"".join(out_data)
+def synchronised(data): # converting 0xFF00 => 0xFF
+	data = data.replace('\xFF'+'\x00', '\xFF')
+	return data
 	
-def unsynchronised(data): # converting 0XFF => 0xFF00
-	indx = 0
-	out_data = []
-	while indx < len(data) :
-		if (data[indx] == '\xFF'):
-			out_data.append('\xFF'+'\x00') # add 0x00 and proceed
-			indx += 1
-		else:
-			out_data.append(data[indx]) # copy one byte and proceed
-			indx += 1
-	if (indx < len(data)):
-		out_data.append(data[indx:]) # copy remaining bytes, if any
-	return b"".join(out_data)
+def unsynchronised(data): # converting 0xFF00 => 0xFF0000
+	data = data.replace('\xFF', '\xFF'+'\x00')
+	return data 
 	
 def decode_payload(tag, header_flags, frame_flags, data, sz, id3_ver):
-	# Handling 'Data length indicator'
-	if ( (ord(frame_flags[1]) & 0x01) != False): 
-		data_length_indicator = decode_frame_sz(data[0:0+4], id3_ver)
-		print "Data_length_indicator:\t", data_length_indicator
-		data=data[4:]
-		sz -=4
-
-	# Unsynchronisation
-	if ( ((ord(header_flags) & 0x80) != False) or ( (ord(frame_flags[1]) & 0x02) != False)): 
+	if ord(id3_ver) != 3:
+		# Handling 'Data length indicator'
+		if ( (ord(frame_flags[1]) & 0x01) != False): 
+			data_length_indicator = decode_frame_sz(data[0:0+4], id3_ver)
+			print "Data_length_indicator:\t", data_length_indicator
+			data=data[4:]
+			sz -=4
+		# Unsynchronisation, only if not done globally (header_flags)
+		if ( ((ord(header_flags) & 0x80) == False) or ( (ord(frame_flags[1]) & 0x02) != False)): 
 			data= synchronised(data)
-			
+		
 	if is_text_info_frame(tag):
 		data = decode_text(data, len(data))
 		chunks = data.split('\x00')	# '\x00' separated chunks
@@ -171,25 +155,63 @@ def decode_payload(tag, header_flags, frame_flags, data, sz, id3_ver):
 			print chunks[chunk_indx] + " ",
 			chunk_indx +=1
 		print ""
+	elif(tag == "TXXX"):
+		text_encoding = binhex.binascii.hexlify(data[0])
+		chunks = data[1:sz].split('\x00', 1)
+		description = decode_text(data[0]+chunks[0],len(data[0]+chunks[0]))
+		value = decode_text(data[0]+chunks[1],len(data[0]+chunks[1]))
+		print "Text encoding:\t\t", text_encoding
+		print "Description:\t\t", description
+		print "Value:\t\t\t", value
+		is_url_link_frame	
+	elif is_url_link_frame	(tag):
+		# Yet to implement the following provision:
+		#	If the text string is followed by a string termination, all the following
+   		#	information should be ignored and not be displayed.
+		url = decode_text(data, len(data))
+		print "URL:\t\t\t", url
+	elif(tag == "WXXX"):
+		text_encoding = binhex.binascii.hexlify(data[0])
+		chunks = data[1:sz].split('\x00', 1)
+		description = decode_text(data[0]+chunks[0],len(data[0]+chunks[0]))
+		url = decode_text(chunks[1],len(chunks[1]))
+		print "Text encoding:\t\t", text_encoding
+		print "Description:\t\t", description
+		print "URL:\t\t\t", url
 	elif(tag == "APIC"):
 		text_encoding = binhex.binascii.hexlify(data[0])
 		chunks = data[1:sz].split('\x00', 2)
 		mime_type = decode_text(data[0]+chunks[0],len(data[0]+chunks[0]))
+		if (mime_type == ""): # MIME Type is ommited
+			mime_type = "image/"
 		picture_type = binhex.binascii.hexlify(chunks[1][0])
 		picture_type_int = ord(chunks[1][0])
 		description = decode_text(data[0]+chunks[1][1:],len(data[0]+chunks[1][1:]))
-		img_data = chunks[2]; # image
+		image = chunks[2]; # image
 		
 		print "Text encoding\t\t", text_encoding
 		print "MIME type:\t\t", mime_type
-		print "Picture type:\t\t", "$", picture_type, ": " + picture_type_dict[int(picture_type)]
+		print "Picture type:\t\t", "$", picture_type, ": " + picture_type_dict[picture_type_int]
 		print "Description:\t\t", description
-		print "Data:\t\t\t<image>"
 		
-		file_name = suffix+":"+mime_type+":"+picture_type_dict[picture_type_int]+":"+description
-		fp = open(file_name.replace("/", " "), "wb")
-		fp.write(img_data)
-		fp.close()
+		if (mime_type == "-->"): # image link
+			print "Data:\t\t\t", image
+		else:
+			if (len(mime_type.split("/")) == 2): img_type = mime_type.split("/")[1]
+			else: img_type = ""
+			file_name = suffix+":"+picture_type_dict[picture_type_int]+":"+description+"."+img_type
+			fp = open(file_name.replace("/", " "), "wb")
+			fp.write(image)
+			fp.close()
+			print "Data:\t\t\t", "Written into file:", file_name
+	elif(tag == "PCNT"):
+		counter = data
+		chunk_indx = 1
+		print "Counter:\t\t\t", 
+		while chunk_indx < len(counter):
+			print binhex.binascii.hexlify(counter[chunk_indx]),
+			chunk_indx +=1
+		print ""
 	elif(tag == "POPM"):
 		chunks = data[0:0+sz].split('\x00', 1)
 		email_to_user = decode_text(chunks[0],len(chunks[0]))
@@ -197,9 +219,11 @@ def decode_payload(tag, header_flags, frame_flags, data, sz, id3_ver):
 		print "Email to user:\t\t", email_to_user
 		print "Rating:\t\t\t", rating
 		chunk_indx = 1
+		print "Counter:\t\t\t", 
 		while chunk_indx < len(chunks[1]):
-			print "Rating:\t", binhex.binascii.hexlify(chunks[1][chunk_indx])		
+			print binhex.binascii.hexlify(chunks[1][chunk_indx]),
 			chunk_indx +=1
+		print ""
 	elif(tag == "USLT"):
 		text_encoding = binhex.binascii.hexlify(data[0])
 		language = binhex.binascii.hexlify(data[1])+binhex.binascii.hexlify(data[2])+binhex.binascii.hexlify(data[3])
@@ -222,19 +246,19 @@ def decode_payload(tag, header_flags, frame_flags, data, sz, id3_ver):
 		print "MIME type:\t\t", mime_type
 		print "Filename:\t\t", filename
 		print "Content description:\t", content_description
-		print "Encapsulated object:\t", "<binary data>"
-		file_name = suffix+":"+":"+content_description+":"+filename+"."+mime_type
+		file_name = suffix+":"+content_description+":"+filename+"."+mime_type
 		fp = open(file_name.replace("/", " "), "wb")
 		fp.write(data)
 		fp.close()
+		print "Encapsulated object:\t", "Written into file:", file_name
 	elif(tag == "MCDI"):
 		cd_toc = data # data
 		#print "CD TOC:\t\t\t", cd_toc # Not to Display
-		print "CD TOC:\t\t\t", "<binary data>"
-		file_name = suffix+"-"+"CD TOC"
+		file_name = suffix+":"+"CD TOC"
 		fp = open(file_name.replace("/", " "), "wb")
 		fp.write(data)
 		fp.close()
+		print "CD TOC:\t\t\t", "Written into file:", file_name
 	elif(tag == "COMM"):
 		text_encoding = binhex.binascii.hexlify(data[0])
 		language = binhex.binascii.hexlify(data[1])+binhex.binascii.hexlify(data[2])+binhex.binascii.hexlify(data[3])
@@ -255,11 +279,12 @@ def decode_payload(tag, header_flags, frame_flags, data, sz, id3_ver):
 		print "Text encoding:\t\t", text_encoding
 		print "Language:\t\t", language + " : " + language_str
 		print "The actual text:\t", data	
-	elif tags_dict.has_key(tag):
-		data = decode_text(data, sz) # data
+	elif tags_dict.has_key(tag): # TAG not supported yet
+		#data = decode_text(data, sz) # data
+		data = "<Not Decoded> TAG not supported yet"
 		print "Data:\t\t\t", data	
-	else:
-		data = "<Not Decoded>" # Unknown TAG
+	else: # Unknown TAG
+		data = "<Not Decoded> Unknown TAG" 
 		print "Data:\t\t\t", data	
 	
 def encode_payload(tag,opt):
@@ -275,7 +300,7 @@ def encode_payload(tag,opt):
 		if(len(args) < 1) or (len(args) > 3):
 			print "Invalid parameters for adding TAG:", tag
 			sys.exit(2)
-		img_file = args[0] 	# Image File
+		image = args[0] 	# Image File
 		if(len(args) > 1):
 			img_type = int(args[1])
 		else:
@@ -293,7 +318,7 @@ def encode_payload(tag,opt):
 		mime_type = "image/jpeg".encode('ascii')+chr(0)
 		pic_type = chr(img_type)	# Picture type'
 		description = description.encode('ascii')+chr(0)	
-		pic_data = get_img(img_file)
+		pic_data = get_img(image)
 		encoded_data = text_encoding+mime_type+pic_type+description+pic_data
 	elif (tag == "COMM"):
 		if(len(args) < 1) or (len(args) > 2):
@@ -384,6 +409,12 @@ def get_img(img_file):
 
 def is_text_info_frame(tag): # Text information frames
 	if( (tags_dict.has_key(tag)) and (tag[0] == "T") and (tag != "TXXX" )):
+		return True
+	else:
+		return False
+
+def is_url_link_frame(tag): # URL link frames
+	if( (tags_dict.has_key(tag)) and (tag[0] == "W") and (tag != "WXXX" )):
 		return True
 	else:
 		return False
@@ -521,7 +552,8 @@ picture_type_dict = {\
          0x14 :'Publisher/Studio logotype'
          }
                   
-opt_map = {'a':'TOPE',\
+write_opts_dict = {\
+           'a':'TOPE',\
            'A':'TALB',\
            'AX':'TOAL',\
            't':'TIT2',\
@@ -570,50 +602,69 @@ print "ID3v2 flags:\t\t" ,binhex.binascii.hexlify(header_flags)
 print "ID3v2 size:\t\t", id3_tag_sz
 print "**********************************\n"
 
+id3_tag = ip_buf[len(header):len(header)+id3_tag_sz]
+song_data = ip_buf[id3_tag_sz+10:]
+
+# Unsynchronisation entire TAG (header_flags)
+if ((ord(id3_ver) == 3) and ((ord(header_flags) & 0x80) != False)): 
+	id3_tag = synchronised(id3_tag)
+	id3_tag_sz = len(id3_tag)
+
 # Decoding Extended Header
 extended_header_flag = ord(header_flags) & 0x40
 if (extended_header_flag == 0):
 	extended_header = ""
 	extended_header_sz = 0
 else:
-	[extended_header, extended_header_sz] = decode_extended_header(ip_buf[10:], id3_rev)
+	[extended_header, extended_header_sz] = decode_extended_header(id3_tag, id3_rev)
 	
-indx=10+extended_header_sz
-id3_tag = ip_buf[0:id3_tag_sz+10]
-song_data = ip_buf[id3_tag_sz+10:]
+indx=extended_header_sz
 
-frames_buf = []
-frames_buf.append(extended_header)
-while (indx) < (id3_tag_sz+10):
+org_frames_buf = []
+org_frames_buf.append(extended_header)
+while (indx < id3_tag_sz):
 	print "Index:\t\t\t", indx
 	[tag, header_sz, sz, frame_flags, data] = decode_frame(id3_tag[indx:], id3_ver)
-	#if  tags_dict.has_key(tag) == False:
 	if  (tag == '\x00'+'\x00'+'\x00'+'\x00'): # tag == NULL+NULL+NULL+NULL
 		break
 	match = 0
 	for opt in opts:
-		if ( (opt_map.has_key(opt[0][1:])) and (tag == opt_map[opt[0][1:]]) ):
+		if ( (write_opts_dict.has_key(opt[0][1:])) and (tag == write_opts_dict[opt[0][1:]]) ):
 			match = 1
-			print "Removing in out file"
 			break
-	if match == 0:
-		frames_buf.append(id3_tag[indx:indx+header_sz+sz])
 	decode_payload(tag, header_flags,frame_flags, data, sz, id3_ver)
+	if match == 0: org_frames_buf.append(id3_tag[indx:indx+header_sz+sz])
+	else: print "Not writing this frame into output file"
 	indx=indx+header_sz+sz
 	print "----------------------------------"			
 	
+write_output = False
+new_frames_buf = []
 for opt in opts:
-	if (opt_map.has_key(opt[0][1:])):
-		print "\nAdding Frame:", opt_map[opt[0][1:]]
-		frames_buf.append(encode_frame(opt_map[opt[0][1:]],opt[1], id3_ver, header_flags))
+	if (write_opts_dict.has_key(opt[0][1:])):
+		write_output = True 
+		print "\nAdding Frame:", write_opts_dict[opt[0][1:]]
+		print "**********************************\n"
+		new_frames_buf.append(encode_frame(write_opts_dict[opt[0][1:]],opt[1], id3_ver, header_flags))
 
-#frames_buf.append('\x00' * 100) # Padding
-out_frames = b"".join(frames_buf)
-new_buf = header[0:0+6]+encode_tag_sz(len(out_frames))+ out_frames + song_data
+if (write_output == True):
+	print "\nWriting output into out.mp3"
+	#new_frames_buf.append('\x00' * 100) # Padding
+	org_frames = b"".join(org_frames_buf)
+	new_frames = b"".join(new_frames_buf)
+	if ord(id3_ver) == 3:
+                #  checking if Unsynchronisation is needed
+                unsync_new_frames = unsynchronised(new_frames)
+                if ( len(new_frames) != len(unsync_new_frames)):
+                        new_frames = unsync_new_frames
+			# set 'Unsynchronisation', for entire TAG (header_flags)
+			header_flags = chr(ord(header_flags) | 0x80) 
+
+	new_buf = header[0:0+5] + header_flags + encode_tag_sz(len(org_frames)+len(new_frames)) + org_frames + new_frames + song_data
 	
-o_fp = open('./out.mp3', 'wb')
-o_fp.write(new_buf)
-o_fp.close()
+	o_fp = open('./out.mp3', 'wb')
+	o_fp.write(new_buf)
+	o_fp.close()
 	
 print "\n*** Done ***\n" 
 	
