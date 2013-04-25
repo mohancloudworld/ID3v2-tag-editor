@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Licence:  GPLv3 (GNU General Public License - version 3).
+# License:  GPLv3 (GNU General Public License - version 3).
 # Disclaimer: Use at your own risk.
 # To know the status of this utility, refer to the README.
 
@@ -26,15 +26,19 @@ class TagEditorID3v2Major3(object):
 		self.tag_header_sz = 10
 		self.frame_header_sz = 10
 		self.is_tag_unsynchronisation_enabled = True
-		self.default_encoding_type='utf-16' # choose from self.encoding_type_dict, used for creating/modifying Frames
+		self.default_encoding_type='utf-16' # choose from self.encoding_types_dict, used for creating/modifying Frames
 		self.logger = logger
 
-		# Supported "Encoding Types" : "Encoding Byte"
-		self.encoding_type_dict = {\
-			'ascii'		: '\x00',	# $00 - ISO-8859-1 (ASCII).\
-			'utf-16'	: '\x01'	# $01 - UCS-2 in ID3v2.2 and ID3v2.3, UTF-16 encoded Unicode with BOM.\
+		# Supported "Encoding Byte":"Encoding Types"
+		self.encoding_types_dict = {\
+			'\x00':'ascii',	# $00 - ISO-8859-1 (ASCII).\
+			'\x01':'utf-16'	# $01 - UCS-2 in ID3v2.2 and ID3v2.3, UTF-16 encoded Unicode with BOM.\
 		}
-
+		# Supported "Encoding Types":"String Terminator"
+		self.string_terminators_dict = {\
+			'ascii' :'\x00',			# $00 - ISO-8859-1 (ASCII)\
+			'utf-16':'\x00'+'\x00'	# $00 00 - UTF-16 \
+		}
 		# Declared/Supported Frames
 		self.declared_frames_dict = {\
 			'AENC':'Audio encryption',\
@@ -120,7 +124,7 @@ class TagEditorID3v2Major3(object):
 		}
 
 		# Supported picture types in 'APIC' frames
-		self.picture_type_dict = {\
+		self.picture_types_dict = {\
 			0x00 :'Other',\
 			0x01 :'32x32 pixels \'file icon\' (PNG only)',\
 			0x02 :'Other file icon',\
@@ -287,9 +291,9 @@ class TagEditorID3v2Major3(object):
 
 	# remove Frames that match with frame_details
 	def removeFrame(self, frames_dict, frame_id):
-		if(self.write_opts_dict.has_key(frame_id)): # frame as discriptive names, like 'tilte' 
+		if(self.write_opts_dict.has_key(frame_id)): # frame as descriptive names, like 'tilte' 
 			frame_id = self.write_opts_dict[frame_id]
-		else: # frame as standerd Frame ID, like 'TIT2'
+		else: # frame as standard Frame ID, like 'TIT2'
 			frame_id = frame_id # redundant
 		if (frames_dict.has_key(frame_id)):
 			for frame in reversed(frames_dict[frame_id]): # for each similar Frame (same TAG)
@@ -308,7 +312,7 @@ class TagEditorID3v2Major3(object):
 	def dispFrame(self, frames_dict, frame_id):
 		if(self.write_opts_dict.has_key(frame_id)): # frame as discriptive names, like 'tilte' 
 			frame_id = self.write_opts_dict[frame_id]
-		else: # frame as standerd Frame ID, like 'TIT2'
+		else: # frame as standard Frame ID, like 'TIT2'
 			frame_id = frame_id # redundant
 		if (frames_dict.has_key(frame_id)):
 			for frame in frames_dict[frame_id]: # for each Frame of the TAG
@@ -340,7 +344,7 @@ class TagEditorID3v2Major3(object):
 		if(self.tag_body_sz): # non-empty body
 			out_data = self.tag_header[0:0+5] + chr(self.tag_header_flags) +  self.encodeTagSz(self.tag_body_sz) + \
 						  self.tag_body + self.song_data
-		else: # if empty body, remove ID3v2 TAG
+		else: # if no Frames, remove ID3v2 TAG
 			out_data = self.song_data
 		return out_data
 
@@ -357,12 +361,22 @@ class TagEditorID3v2Major3(object):
 			data= self.synchronise(data)
 	
 		if self.isTextInfoFrame(frame_id):
-			data = self.decodeText(data, len(data))
-			data = data.replace('\x00', ' ') # to print, convert NULL seperated text to space seperated text
-			self.logger.warning("Data:\t\t\t%s" % data)
+			text_encoding = binhex.binascii.hexlify(data[0])
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(data[1:sz], encoding_type, -1) # -1 => as many splits as possible
+			# All text information frames supports multiple strings, stored as a 'termination code' separated list
+			info = []
+			for enc_data in chunks:
+				info.append(self.decodeText(data[0]+enc_data,len(data[0]+enc_data)))
+			# If the textstring is followed by a termination \
+			# all the following information should be ignored and not be displayed.
+			if( chunks[-1] != ""): # if terminated, last chunk will be empty
+				self.logger.info("Text encoding:\t\t%s" % text_encoding)
+				self.logger.warning("Information:\t\t%s" % (", ".join(info)) )
 		elif(frame_id == "TXXX"):
 			text_encoding = binhex.binascii.hexlify(data[0])
-			chunks = data[1:sz].split('\x00', 1)
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(data[1:sz], encoding_type, 1)
 			description = self.decodeText(data[0]+chunks[0],len(data[0]+chunks[0]))
 			value = self.decodeText(data[0]+chunks[1],len(data[0]+chunks[1]))
 			self.logger.info("Text encoding:\t\t%s" % text_encoding)
@@ -377,7 +391,8 @@ class TagEditorID3v2Major3(object):
 			self.logger.warning("URL:\t\t\t%s" % url)
 		elif(frame_id == "WXXX"):
 			text_encoding = binhex.binascii.hexlify(data[0])
-			chunks = data[1:sz].split('\x00', 1)
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(data[1:sz], encoding_type, 1)
 			description = self.decodeText(data[0]+chunks[0],len(data[0]+chunks[0]))
 			url = self.decodeText(chunks[1],len(chunks[1]))
 			self.logger.info("Text encoding:\t\t%s" % text_encoding)
@@ -385,19 +400,20 @@ class TagEditorID3v2Major3(object):
 			self.logger.warning("URL:\t\t\t%s" % url)
 		elif(frame_id == "APIC"):
 			text_encoding = binhex.binascii.hexlify(data[0])
-			# since 'picture_type' can be '\x00', so parsing/splitting is done step-by-step
-			chunks = data[1:sz].split('\x00', 1)
+			# since 'picture_type' can be '\x00', parsing/splitting is done step-by-step
+			chunks = self.splitNullTerminatedEncStrings(data[1:sz], 'ascii', 1)
 			mime_type = self.decodeText(chunks[0],len(chunks[0]))
-			if (mime_type == ""): # MIME Type is ommited
+			if (mime_type == ""): # MIME Type is omitted
 				mime_type = "image/"
 			picture_type = binhex.binascii.hexlify(chunks[1][0])
 			picture_type_int = ord(chunks[1][0])
-			chunks = chunks[1][1:].split('\x00', 1)
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(chunks[1][1:], encoding_type, 1)
 			description = self.decodeText(data[0]+chunks[0],len(data[0]+chunks[0]))
 			image = chunks[1]; # image
 			self.logger.info("Text encoding\t\t%s" % text_encoding)
 			self.logger.info("MIME type:\t\t%s" % mime_type)
-			self.logger.warning("Picture type:\t\t$%s : %s" % (picture_type, self.picture_type_dict[picture_type_int]))
+			self.logger.warning("Picture type:\t\t$%s : %s" % (picture_type, self.picture_types_dict[picture_type_int]))
 			self.logger.info("Description:\t\t%s" % description)
 
 			if (mime_type == "-->"): # image link
@@ -405,7 +421,7 @@ class TagEditorID3v2Major3(object):
 			else:
 				self.logger.warning("Data:\t\t\t<Not displayed>")
 				img_type = mime_type.split("/")[1]
-				file_name = self.suffix+"_"+ self.picture_type_dict[picture_type_int]+"_"+description+"."+img_type
+				file_name = self.suffix+"_"+ self.picture_types_dict[picture_type_int]+"_"+description+"."+img_type
 				file_name = file_name.replace("/", "|")
 				if(self.logger.isEnabledFor(logging.INFO)):
 					self.writeFile(file_name, image)
@@ -419,7 +435,7 @@ class TagEditorID3v2Major3(object):
 				chunk_indx +=1
 			self.logger.info("")
 		elif(frame_id == "POPM"):
-			chunks = data[0:0+sz].split('\x00', 1)
+			chunks = self.splitNullTerminatedEncStrings(data[1:sz], 'ascii', 1)
 			email_to_user = self.decodeText(chunks[0],len(chunks[0]))
 			rating = binhex.binascii.hexlify(chunks[1][0])
 			self.logger.info("Email to user:\t\t%s" % email_to_user)
@@ -434,7 +450,8 @@ class TagEditorID3v2Major3(object):
 			text_encoding = binhex.binascii.hexlify(data[0])
 			language = binhex.binascii.hexlify(data[1])+binhex.binascii.hexlify(data[2])+binhex.binascii.hexlify(data[3])
 			language_str = chr(ord(data[1]))+chr(ord(data[2]))+chr(ord(data[3]))
-			chunks = data[4:sz].split('\x00', 1)
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(data[4:sz], encoding_type, 1)
 			content_descriptor = self.decodeText(data[0]+chunks[0],len(data[0]+chunks[0]))
 			lyrics_text = self.decodeText(data[0]+chunks[1],len(data[0]+chunks[1]))
 			self.logger.info("Text encoding:\t\t%s" % text_encoding)
@@ -443,7 +460,8 @@ class TagEditorID3v2Major3(object):
 			self.logger.warning("Lyrics/text:\t\t%s" % lyrics_text)
 		elif(frame_id == "GEOB"):
 			text_encoding = binhex.binascii.hexlify(data[0])
-			chunks = data[1:sz].split('\x00', 3)
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(data[1:sz], encoding_type, 3)
 			mime_type = self.decodeText(chunks[0],len(chunks[0]))
 			filename = self.decodeText(data[0]+chunks[1],len(data[0]+chunks[1]))
 			content_description = self.decodeText(data[0]+chunks[2],len(data[0]+chunks[2]))
@@ -470,7 +488,8 @@ class TagEditorID3v2Major3(object):
 			text_encoding = binhex.binascii.hexlify(data[0])
 			language = binhex.binascii.hexlify(data[1])+binhex.binascii.hexlify(data[2])+binhex.binascii.hexlify(data[3])
 			language_str = chr(ord(data[1]))+chr(ord(data[2]))+chr(ord(data[3]))
-			chunks = data[4:sz].split('\x00', 1)
+			encoding_type = self.encoding_types_dict[data[0]]
+			chunks = self.splitNullTerminatedEncStrings(data[4:sz], encoding_type, 1)
 			short_content_descrip = self.decodeText(data[0]+chunks[0],len(data[0]+chunks[0]))
 			the_actual_text = self.decodeText(data[0]+chunks[1],len(data[0]+chunks[1]))
 			self.logger.info("Text encoding:\t\t%s" % text_encoding)
@@ -509,12 +528,11 @@ class TagEditorID3v2Major3(object):
 		if (sz == 0):
 			return ""
 		encoding_byte = data[0]
-		# finding the 'encoding' type
-		encoding_type = None # initialize
-		for supported_encoder in self.encoding_type_dict:		
-			if(self.encoding_type_dict[supported_encoder] == encoding_byte): # matched
-				encoding_type = supported_encoder 
-				break
+		if(self.encoding_types_dict.has_key(encoding_byte)):
+			encoding_type = self.encoding_types_dict[encoding_byte]
+		else:
+			encoding_type = None # unspecified 'encoding_byte'
+		
 		# decode
 		if(encoding_type): # known encoding_type
 			text = data[1:sz].decode(encoding_type)
@@ -545,9 +563,9 @@ class TagEditorID3v2Major3(object):
 				self.logger.critical("Invalid parameters for adding TAG:%s" % frame_id)
 				error_msg = "Invalid parameters for adding TAG:%s" % frame_id
 				raise Exception(1, error_msg)
+			text_encoding = self.getEncByteForEncType(self.default_encoding_type)
 			data =  args[0].decode('utf-8').encode(self.default_encoding_type)
-			text_encoding = self.encoding_type_dict[self.default_encoding_type]
-			encoded_data  = text_encoding+data 
+			encoded_data  = text_encoding+data
 		elif (frame_id == "APIC"):
 			if(len(args) < 1) or (len(args) > 3):
 				self.logger.critical("Invalid parameters for adding TAG:%s" % frame_id)
@@ -560,18 +578,20 @@ class TagEditorID3v2Major3(object):
 				img_type = 3		 # Default: Cover (front) 
 				 
 			if(len(args) > 2):
-				description = args[2]
+				description = args[2].decode('utf-8')
 			else:
 				description = "" # Blank (Null)
 
-			if self.picture_type_dict.has_key(img_type) == False:
-				self.logger.critical("Unknown 'Picture type' : %d" % img_type)
-				error_msg = "Unknown 'Picture type' : %d" % img_type
-				raise Exception(1, error_msg)
-			text_encoding = chr(0)	# $00 - ISO-8859-1 (ASCII).
-			mime_type = "image/jpeg".encode('ascii')+chr(0)
+			if self.picture_types_dict.has_key(img_type) == False:
+				self.logger.warning("Unknown 'Picture type' : %d" % img_type)
+				self.logger.warning("Defaulting to 3: Cover (front)")
+				img_type = 3		 # Default: Cover (front) 
+			
+			text_encoding = self.getEncByteForEncType(self.default_encoding_type)
+			str_terminator = self.getStrTerminatorForEncType(self.default_encoding_type)
+			mime_type = "image/jpeg".encode('ascii')+self.getStrTerminatorForEncType('ascii') # MIME type is always 'ascii'
 			pic_type = chr(img_type)	# Picture type'
-			description = description.encode('ascii')+chr(0)	
+			description = description.encode(self.default_encoding_type)+str_terminator	
 			pic_data = self.getImageData(image)
 			encoded_data = text_encoding+mime_type+pic_type+description+pic_data
 		elif (frame_id == "COMM"):
@@ -579,15 +599,16 @@ class TagEditorID3v2Major3(object):
 				self.logger.critical("Invalid parameters for adding TAG:%s" %frame_id)
 				error_msg = "Invalid parameters for adding TAG:%s" %frame_id
 				raise Exception(1, error_msg)
-			data = args[0]
+			data = args[0].decode('utf-8')
 			if(len(args) > 1):
-				description = args[1]
+				description = args[1].decode('utf-8')
 			else:
 				description = "" # Blank (Null)
-			text_encoding = chr(0)	# $00 - ISO-8859-1 (ASCII).
-			language = "ENG".encode('ascii')
-			short_content_description = description.encode('ascii')+chr(0)	# Blank (Null)
-			the_actual_text  = data.encode('ascii')
+			text_encoding = self.getEncByteForEncType(self.default_encoding_type)
+			str_terminator = self.getStrTerminatorForEncType(self.default_encoding_type)
+			language = "---".encode('ascii') # User dependent, cannot be determined
+			short_content_description = description.encode(self.default_encoding_type)+str_terminator	
+			the_actual_text  = data.encode(self.default_encoding_type)
 			encoded_data = text_encoding+language+short_content_description+the_actual_text
 		else:
 			self.logger.critical("Unknown/ReadOnly TAG:%s" % frame_id)
@@ -623,13 +644,79 @@ class TagEditorID3v2Major3(object):
 		if (sz > 0):	self.logger.critical("TAG sz is too large"); error_msg = "TAG sz is too large"; raise Exception(1, error_msg)
 		str_sz =  chr(byte_0)+chr(byte_1)+chr(byte_2)+chr(byte_3)
 		return str_sz
+	
+	# data = (EncStr1+delimiter) + (EncStr2+delimiter) + ... + StrN
+	# 'data' contains concatenated encoded-strings (EncStr1, EncStr2, ...) terminated according to Encoding-Type 
+	# and a last string (StrN) which may be encoded or a binary string.
+	# This function splits 'data' and returns [EncStr1, EncStr2, ... , StrN]
+	#
+	# For UTF-16, UTF-16-BE, every character is 2-byte long and 'String-Terminator' is also 2-bytes ('\x00'+'\x00').
+	# When searching for 'String-Terminator', if the character preceding to 'String-Terminator', has lower-byte '\x00', 
+	# the find() function will give wrong index. So, indx needs to align to even location
+	def splitNullTerminatedEncStrings(self, data, encoding_type, no_of_splits):
+		string_terminator = self.getStrTerminatorForEncType(encoding_type)
+		string_terminator_len = len(string_terminator)
+		if( string_terminator_len == 1):
+			return data.split(string_terminator, no_of_splits)
+		elif(string_terminator_len == 2): 
+			enc_str_lst = []
+			cnt = 0
+			while (cnt < no_of_splits):
+				indx = data.find(string_terminator)
+				if(indx == -1): break
+				elif((indx % 2) != 0): indx += 1 # aligning to even loc
+				enc_str_lst.append(data[:indx])
+				data = data[indx+string_terminator_len:] # skipping string_terminator
+				cnt += 1
+			enc_str_lst.append(data) # last segment
+			return enc_str_lst
+		else:
+			error_msg = "Unsupported String Terminator"
+			raise Exception(1, error_msg)
 
+	# returns encoding_byte for a give encoding_type
+	def getEncByteForEncType(self, encoding_type):
+		# finding the 'encoding' byte
+		encoding_byte = None # initialize
+		for supported_encoder in self.encoding_types_dict:
+			if(self.encoding_types_dict[supported_encoder] == encoding_type): # matched
+				encoding_byte = supported_encoder
+				break
+		return encoding_byte
+
+	# returns string_terminator for a give encoding_type
+	def getStrTerminatorForEncType(self, encoding_type):
+		# finding 'String Terminator'
+		if(self.string_terminators_dict.has_key(encoding_type)):
+			string_terminator = self.string_terminators_dict[encoding_type]
+		else:
+			error_msg = "Unsupported String Terminator"
+			raise Exception(1, error_msg)
+		return string_terminator
+
+	# returns string_terminator for a give encoding_byte
+	def getStrTerminatorForEncByte(self, encoding_byte):
+		# finding 'Encoding Type'
+		if(self.encoding_types_dict.has_key(encoding_byte)):
+			encoding_type = self.encoding_types_dict[encoding_byte]
+		else:
+			error_msg = "Illegal Encoding Byte"
+			raise Exception(1, error_msg)	
+		# finding 'String Terminator'
+		if(self.string_terminators_dict.has_key(encoding_type)):
+			string_terminator = self.string_terminators_dict[encoding_type]
+		else:
+			error_msg = "Unsupported String Terminator"
+			raise Exception(1, error_msg)
+		return string_terminator
+
+	# extract image data (resized), from image-file
 	def getImageData(self, img_file):
 		img_buf = StringIO.StringIO()
 		try:
 			img = Image.open(img_file)
 			img = img.resize((640,960), Image.NEAREST)
-			self.logger.info("Image resized to 640x960")
+			self.logger.info("Image re-sized to 640x960")
 			img.save(img_buf,"JPEG")
 			data= img_buf.getvalue()
 		except IOError, err:
@@ -708,7 +795,7 @@ class TagEditorID3v2Major3(object):
 									self.encodeFrame(self.write_opts_dict[frame_id], opts_dict[frame_id], self.tag_header_flags))
 				data_modified = True 
 		
-		# interctive mode
+		# interactive mode
 		if(opts_dict['interactive']): self.displayInteractiveHelp()
 		while (opts_dict['interactive']):
 			try:
@@ -806,14 +893,19 @@ class TagEditorID3v2Major4(TagEditorID3v2Major3):
 		super(TagEditorID3v2Major4, self).__init__(logger)
 		self.major_ver = 4
 		self.is_tag_unsynchronisation_enabled = False
-		self.default_encoding_type='utf-8' # choose from self.encoding_type_dict, used for creating/modifying Frames
+		self.default_encoding_type='utf-8' # choose from self.encoding_types_dict, used for creating/modifying Frames
 
-		# added/updated: Supported "Encoding Types" : "Encoding Byte"
-		self.encoding_type_updates_dict = {\
-			'utf-16-be'	: '\x02',	# $02 - UTF-16BE encoded Unicode without BOM in ID3v2.4 only.\
-			'utf-8'		: '\x03'		# $03 - UTF-8 encoded Unicode in ID3v2.4 only.\
+		# added/updated: Supported "Encoding Byte":"Encoding Types"
+		self.encoding_types_updates_dict = {\
+			'\x02':'utf-16-be',	# $02 - UTF-16BE encoded Unicode without BOM in ID3v2.4 only.\
+			'\x03':'utf-8'			# $03 - UTF-8 encoded Unicode in ID3v2.4 only.\
 		}
-
+		# Supported "Encoding Types":"String Terminator"
+		self.string_terminators_updates_dict = {\
+			'utf-16-be'	:'\x00'+'\x00',	# $00 00 - UTF-16-BE \
+			'utf-8' 		:'\x00'				# $00 - UTF-8 \
+		}
+		
 		# added/updated: Declared/Supported Frames
 		self.declared_frames_updates_dict = {\
 			'ASPI':'Audio seek point index',\
@@ -842,7 +934,9 @@ class TagEditorID3v2Major4(TagEditorID3v2Major3):
 		}
 
 		# updating: Supported Encoding Types
-		self.encoding_type_dict.update(self.encoding_type_updates_dict)		
+		self.encoding_types_dict.update(self.encoding_types_updates_dict)
+		# updating: String Terminators
+		self.string_terminators_dict.update(self.string_terminators_updates_dict)		
 		# updating: Declared Frames List
 		self.declared_frames_dict.update(self.declared_frames_updates_dict)
 		# updating: mapping of options to frames
@@ -891,7 +985,7 @@ class TagEditorID3v2(object):
 		group3.add_argument('-P', '--picture', metavar='ALBUM_ART_INFO', \
 							 help='ALBUM_ART_INFO = <image-file>[,<picture-type-integer>[,<description>]]')
 
-		group4 = parser.add_argument_group('to interactivly edit Frames')
+		group4 = parser.add_argument_group('to interactively edit Frames')
 		group4.add_argument('-i', '--interactive', action="store_true", default=False)
 
 		opts_name_space = parser.parse_args(inp_args)
@@ -939,7 +1033,8 @@ class TagEditorID3v2(object):
 				inp_fp = open(inp_file_name, 'rb')
 			except IOError, err:
 				self.logger.critical( str(err) )
-				sys.exit(2)
+				#sys.exit(2)
+				continue
 			
 			inp_buf = inp_fp.read()
 			inp_fp.close()

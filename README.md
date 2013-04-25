@@ -15,11 +15,12 @@ Status:
 (7) While writing APIC frame, image is resize to (640,960), to save space
 (8) Writes binary data of frames (APIC, GEOB, MCDI) into files in local directory
 (9) Multiple (two) levels of verbosity is supported
-(10) Issues:(a) While modifying a frame, skips writing all other similar frames into output file
-               (It should skip frames with same 'Content type' only)
-	   (b) Repetition of frames while reading/writing is not checked 
-	   (c) 'Data length indicator' flag is not used while writing frames 
-	   (d) writing and deleting of frames is limited to only few types of frames 
-	   (e) Other frames & flags need to be implemented
+(10) Most of the user input is parsed as unicode-data, so that user can feed information in multiple languages
+(11) Issues:(a) While modifying a frame, skips writing all other similar frames into output file
+                (It should skip frames with same 'Content type' only)
+	    (b) Repetition of frames while reading/writing is not checked 
+	    (c) 'Data length indicator' flag is not used while writing frames 
+	    (d) writing and deleting of frames is limited to only few types of frames 
+	    (e) Other frames & flags need to be implemented
 
 Note: usage is compatible with id3v2 linux utility
