@@ -435,7 +435,7 @@ class TagEditorID3v2Major3(object):
 				chunk_indx +=1
 			self.logger.info("")
 		elif(frame_id == "POPM"):
-			chunks = self.splitNullTerminatedEncStrings(data[1:sz], 'ascii', 1)
+			chunks = self.splitNullTerminatedEncStrings(data[0:sz], 'ascii', 1)
 			email_to_user = self.decodeText(chunks[0],len(chunks[0]))
 			rating = binhex.binascii.hexlify(chunks[1][0])
 			self.logger.info("Email to user:\t\t%s" % email_to_user)
@@ -649,31 +649,21 @@ class TagEditorID3v2Major3(object):
 	# 'data' contains concatenated encoded-strings (EncStr1, EncStr2, ...) terminated according to Encoding-Type 
 	# and a last string (StrN) which may be encoded or a binary string.
 	# This function splits 'data' and returns [EncStr1, EncStr2, ... , StrN]
-	#
-	# For UTF-16, UTF-16-BE, every character is 2-byte long and 'String-Terminator' is also 2-bytes ('\x00'+'\x00').
-	# When searching for 'String-Terminator', if the character preceding to 'String-Terminator', has lower-byte '\x00', 
-	# the find() function will give wrong index. So, indx needs to align to even location
 	def splitNullTerminatedEncStrings(self, data, encoding_type, no_of_splits):
-		string_terminator = self.getStrTerminatorForEncType(encoding_type)
-		string_terminator_len = len(string_terminator)
-		if( string_terminator_len == 1):
-			return data.split(string_terminator, no_of_splits)
-		elif(string_terminator_len == 2): 
-			enc_str_lst = []
-			cnt = 0
-			while (cnt < no_of_splits):
-				indx = data.find(string_terminator)
-				if(indx == -1): break
-				elif((indx % 2) != 0): indx += 1 # aligning to even loc
-				enc_str_lst.append(data[:indx])
-				data = data[indx+string_terminator_len:] # skipping string_terminator
-				cnt += 1
-			enc_str_lst.append(data) # last segment
-			return enc_str_lst
-		else:
-			error_msg = "Unsupported String Terminator"
-			raise Exception(1, error_msg)
-
+		data_dec = data.decode(encoding_type, 'ignore')
+		chunks = data_dec.split('\x00', no_of_splits) # String-Terminator for decoded data is always '\x00'
+		enc_str_lst = []
+		for data_dec_seg in chunks[:-1]: # except last chunk
+			enc_str_lst.append(data_dec_seg.encode(encoding_type)) # encoding and keeping in the list
+		# to extracting the last segment:
+		# reconstructing the string 'data_chunks' from chunks (except last chunk)
+		data_dec_chunks = '\x00'.join(chunks[:-1])   # joining all chunks with '\x00' in-between
+		if(data_dec_chunks): data_dec_chunks += '\x00' # if not empty, append '\x00'
+		data_chunks = data_dec_chunks.encode(encoding_type) # this is the original string, except last segment
+		data_chunks_len = len(data_chunks)
+		enc_str_lst.append(data[data_chunks_len:]) # last segment
+		return enc_str_lst
+		
 	# returns encoding_byte for a give encoding_type
 	def getEncByteForEncType(self, encoding_type):
 		# finding the 'encoding' byte
