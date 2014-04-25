@@ -8,7 +8,7 @@ import os.path
 import sys
 import shlex
 import binhex
-import Image
+from PIL import Image
 import StringIO
 import argparse
 import logging
