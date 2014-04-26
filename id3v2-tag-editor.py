@@ -15,7 +15,7 @@ import logging
 
 # Some 'Music apps' in mobile phone are not working with 'Unsynchronisation' flag, so set it to False
 # Decoding with 'Unsynchronisation' flag is still enabled.
-is_unsynchronisation_in_encoding_enabled = False
+unsynchronisation_in_encoding_enabled = False
       
 #class new_myModule3(object):
 class TagEditorID3v2Major3(object):
@@ -25,7 +25,7 @@ class TagEditorID3v2Major3(object):
       self.major_ver = 3
       self.tag_header_sz = 10
       self.frame_header_sz = 10
-      self.is_tag_unsynchronisation_enabled = True
+      self.tag_unsynchronisation_enabled = True
       self.default_encoding_type='utf-16' # choose from self.encoding_types_dict, used for creating/modifying Frames
       self.logger = logger
 
@@ -224,7 +224,7 @@ class TagEditorID3v2Major3(object):
 
    def getSynchronisedTagBody(self):
       # checking if Synchronisation is needed
-      if ( (self.is_tag_unsynchronisation_enabled) and ((self.tag_header_flags & 0x80) != False) ):
+      if ( (self.tag_unsynchronisation_enabled) and ((self.tag_header_flags & 0x80) != False) ):
          syncd_tag_body = self.synchronise(self.tag_body)
       else:
          syncd_tag_body = self.tag_body
@@ -249,7 +249,7 @@ class TagEditorID3v2Major3(object):
          frame_header_flags = None
          data    = None
          frame_header_sz = None
-      return [frame_id, frame_header_sz, sz, frame_header_flags, data]
+      return [frame_id, sz, frame_header_flags, data]
 
    def hasDataLengthIndicator(self, frame_header_flags):
       if ( (frame_header_flags & 0x01) != False):
@@ -316,7 +316,7 @@ class TagEditorID3v2Major3(object):
          frame_id = frame_id # redundant
       if (frames_dict.has_key(frame_id)):
          for frame in frames_dict[frame_id]: # for each Frame of the TAG
-            [frame_id, frame_header_sz, sz, frame_header_flags, data] = self.decodeFrame(frame)
+            [frame_id, sz, frame_header_flags, data] = self.decodeFrame(frame)
             self.decodePayload(frame_id, self.tag_header_flags, frame_header_flags, data, sz)
             self.logger.info("----------------------------------")         
       else:
@@ -330,7 +330,7 @@ class TagEditorID3v2Major3(object):
 
    def assignTagBody(self, syncd_frames):
       # checking if Unsynchronisation is needed
-      if ( (is_unsynchronisation_in_encoding_enabled) and (self.is_tag_unsynchronisation_enabled) ):
+      if ( (unsynchronisation_in_encoding_enabled) and (self.tag_unsynchronisation_enabled) ):
          unsyncd_frames = self.unsynchronise(syncd_frames)
          if ( len(syncd_frames) != len(unsyncd_frames)):
             # set 'Unsynchronisation', for entire TAG 
@@ -356,7 +356,7 @@ class TagEditorID3v2Major3(object):
          data=data[4:]
          sz -=4
       # Unsynchronisation, only if not handled globally
-      if ( (self.is_tag_unsynchronisation_enabled == False) and \
+      if ( (self.tag_unsynchronisation_enabled == False) and \
          ( self.isFrameUnsynchronisationFlagSet(frame_header_flags) == True) ): 
          data= self.synchronise(data)
    
@@ -544,7 +544,7 @@ class TagEditorID3v2Major3(object):
       data    = self.encodePayload(frame_id,data)
       frame_header_flags = chr(0)+chr(0) # all flags: unset
       #  checking if Unsynchronisation is needed
-      if ( (is_unsynchronisation_in_encoding_enabled) and (self.is_tag_unsynchronisation_enabled == False) ):
+      if ( (unsynchronisation_in_encoding_enabled) and (self.tag_unsynchronisation_enabled == False) ):
          unsyncd_data = self.unsynchronise(data)
          if ( len(data) != len(unsyncd_data)):
             data = unsyncd_data
@@ -552,7 +552,7 @@ class TagEditorID3v2Major3(object):
             frame_header_flags = frame_header_flags[0] + chr(ord(frame_header_flags[1]) | 0x02) 
       sz = self.encodeFrameSize(len(data))
       frame = frame_id+sz+frame_header_flags+data
-      [frame_id, frame_header_sz, sz, frame_header_flags, data] = self.decodeFrame(frame)
+      [frame_id, sz, frame_header_flags, data] = self.decodeFrame(frame)
       self.decodePayload(frame_id, tag_header_flags, frame_header_flags, data, sz)   
       return frame
 
@@ -703,16 +703,11 @@ class TagEditorID3v2Major3(object):
    # extract image data (resized), from image-file
    def getImageData(self, img_file):
       img_buf = StringIO.StringIO()
-      try:
-         img = Image.open(img_file)
-         img = img.resize((640,960), Image.NEAREST)
-         self.logger.info("Image re-sized to 640x960")
-         img.save(img_buf,"JPEG")
-         data= img_buf.getvalue()
-      except IOError, err:
-         error_msg = str(err)
-         self.logger.error(error_msg )
-         raise Exception(1, error_msg)
+      img = Image.open(img_file)
+      img = img.resize((640,960), Image.NEAREST)
+      self.logger.info("Image re-sized to 640x960")
+      img.save(img_buf,"JPEG")
+      data= img_buf.getvalue()
       return data
 
    def writeFile(self, file_name, data):
@@ -743,13 +738,7 @@ class TagEditorID3v2Major3(object):
    def process(self, file_name, inp_buf, opts_dict, suffix):
       self.suffix = suffix
       # Validating ID3 Header
-      try:
-         syncd_tag_body = self.decodeHeader(inp_buf)
-      except Exception as inst:
-         self.logger.error("User Exception:" )
-         self.logger.error( inst.args )
-      except:
-         self.logger.critical( str(err) )
+      syncd_tag_body = self.decodeHeader(inp_buf)
       
       self.logger.info("ID3v2/file identifier:\t%s" % self.id3_identifier)
       self.logger.info("ID3v2 version:\t\t0x%0.2x %0.2x" % (self.major_ver, self.revision_no))
@@ -819,7 +808,7 @@ class TagEditorID3v2Major3(object):
                   for frame_id in interactive_opts[1:]: 
                      self.dispFrame(frames_dict, frame_id)
             elif(interactive_opts[0] == "add"): 
-               if (len(interactive_opts) == 1):
+               if (len(interactive_opts) < 3):
                   self.logger.warning("To add frames, type: add <frame-id-1> <data-1> <frame-id-2> <data-2> ...")
                else:
                   #for frame_id, frame in pairwise(interactive_opts[1:]): 
@@ -855,9 +844,11 @@ class TagEditorID3v2Major3(object):
                self.displayInteractiveHelp()
             else: 
                self.logger.warning("\nUnknown command")
+         except IOError, err:
+               self.logger.critical( str(err) )
          except Exception as inst:
-            self.logger.error("User Exception:" )
-            self.logger.error( inst.args )
+               self.logger.error("User Exception:" )
+               self.logger.error( inst.args )
          except:
             self.logger.critical( str(err) )
 
@@ -883,7 +874,7 @@ class TagEditorID3v2Major4(TagEditorID3v2Major3):
    def __init__(self, logger):
       super(TagEditorID3v2Major4, self).__init__(logger)
       self.major_ver = 4
-      self.is_tag_unsynchronisation_enabled = False
+      self.tag_unsynchronisation_enabled = False
       self.default_encoding_type='utf-8' # choose from self.encoding_types_dict, used for creating/modifying Frames
 
       # added/updated: Supported "Encoding Byte":"Encoding Types"
@@ -1018,26 +1009,27 @@ class TagEditorID3v2(object):
       else:
          self.logger.setLevel(logging.ERROR) #  set default level 
       
-      # process for each file
-      for inp_file_name in opts_dict['inp_file']:
-         try:
+      try:
+         # process for each file
+         for inp_file_name in opts_dict['inp_file']:
             inp_fp = open(inp_file_name, 'rb')
-         except IOError, err:
+            inp_buf = inp_fp.read()
+            inp_fp.close()
+            self.logger.warning("File Name: %s" % inp_file_name)
+            suffix = os.path.basename(inp_file_name) # only basename
+            self.logger.info("File Size: %d" %len(inp_buf))
+            #self.logger.info("opts: %s" % opts_dict)
+            self.logger.info("\n**********************************")
+            versionSpecificInstance = self.getVersionSpecificInstance(inp_buf[0:10])
+            if(versionSpecificInstance):  
+               versionSpecificInstance.process(inp_file_name, inp_buf, opts_dict, suffix)
+      except IOError, err:
             self.logger.critical( str(err) )
-            #sys.exit(2)
-            continue
-         
-         inp_buf = inp_fp.read()
-         inp_fp.close()
-         
-         self.logger.warning("File Name: %s" % inp_file_name)
-         suffix = os.path.basename(inp_file_name) # only basename
-         self.logger.info("File Size: %d" %len(inp_buf))
-         #self.logger.info("opts: %s" % opts_dict)
-         self.logger.info("\n**********************************")
-         versionSpecificInstance = self.getVersionSpecificInstance(inp_buf[0:10])
-         if(versionSpecificInstance):  
-            versionSpecificInstance.process(inp_file_name, inp_buf, opts_dict, suffix)
+      except Exception as inst:
+            self.logger.error("User Exception:" )
+            self.logger.error( inst.args )
+      except:
+         self.logger.critical( str(err) )
 
 def main(args):      
    genericInstance = TagEditorID3v2()
