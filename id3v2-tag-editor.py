@@ -505,7 +505,7 @@ class TagEditorID3v2Major3(object):
          self.logger.info("Text encoding:\t\t%s" % text_encoding)
          self.logger.info("Language:\t\t0x%s : %s" % (language, language_str))
          self.logger.warning("The actual text:\t%s" % data   )
-      elif self.has_key(frame_id): # TAG not supported yet
+      elif self.declared_frames_dict.has_key(frame_id): # TAG not supported yet
          data = "<Not Decoded> TAG not supported yet"
          self.logger.warning("Data:\t\t\t%s" % data   )
       else: # Unknown TAG
