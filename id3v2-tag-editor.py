@@ -150,14 +150,14 @@ class TagEditorID3v2Major3(object):
 
         # Mapping 'option' to 'Frames', for adding/modifying Frames
         self.write_opts_dict = {\
-           'artist'      :'TPE1',\
+           'artist'     :'TPE1',\
            'album'      :'TALB',\
            'title'      :'TIT2',\
            'comments'   :'COMM',\
            'genre'      :'TCON',\
-           'year'      :'TYER',\
+           'year'       :'TYER',\
            'track'      :'TRCK',\
-           'picture'   :'APIC'
+           'picture'    :'APIC'
         }
 
     def createHeader(self, song_data):
