@@ -244,11 +244,11 @@ class TagEditorID3v2Major3(object):
                 self.logger.info("\nFrame ID:\t\t%s (%s)" % (frame_id, self.declared_frames_dict[frame_id]))
             else:
                 self.logger.warning("\n%s:" % (self.declared_frames_dict[frame_id]))
-        else: # Unknown Frame ID
+        else: # Unofficial Frame-ID
             if self.logger.isEnabledFor(logging.INFO):
-                self.logger.info("\nFrame ID:\t\t%s (%s)" % (frame_id, "Unknown Frame ID"))
+                self.logger.info("\nFrame ID:\t\t%s (%s)" % (frame_id, "Unofficial Frame"))
             else:
-                self.logger.warning("\n%s (%s):" % (frame_id, "Unknown Frame ID"))
+                self.logger.warning("\n%s (%s):" % (frame_id, "Unofficial Frame"))
         self.logger.info("Size:\t\t\t%d" % sz)
         self.logger.info("Flags:\t\t\t0x%0.4x" % frame_header_flags)
         return [frame_id, sz, frame_header_flags, data]
@@ -510,8 +510,8 @@ class TagEditorID3v2Major3(object):
         elif self.declared_frames_dict.has_key(frame_id): # TAG not supported yet
             data = "<Not Decoded> TAG not supported yet"
             self.logger.warning("Data:\t\t\t%s" % data)
-        else: # Unknown TAG
-            data = "<Not Decoded> Unknown TAG"
+        else: # Unofficial Frame-ID
+            data = "<Not Decoded> Unofficial Frame"
             self.logger.warning("Data:\t\t\t%s", data)
 
     def isTextInfoFrame(self, frame_id): # Text information frames
@@ -585,7 +585,7 @@ class TagEditorID3v2Major3(object):
                 description = "" # Blank (Null)
 
             if self.picture_types_dict.has_key(img_type) == False:
-                self.logger.warning("Unknown 'Picture type' : %d" % img_type)
+                self.logger.warning("Unofficial 'Picture type' : %d" % img_type)
                 self.logger.warning("Defaulting to 3: Cover (front)")
                 img_type = 3       # Default: Cover (front)
 
@@ -612,9 +612,9 @@ class TagEditorID3v2Major3(object):
             short_content_description = description.encode(self.default_encoding_type)+str_terminator
             the_actual_text = data.encode(self.default_encoding_type)
             encoded_data = text_encoding+language+short_content_description+the_actual_text
-        else:
-            self.logger.critical("Unknown/ReadOnly TAG:%s" % frame_id)
-            error_msg = "Unknown/ReadOnly TAG:%s" % frame_id
+        else: # ReadOnly/Unofficial Frame-ID
+            self.logger.critical("ReadOnly/Unofficial Frame-ID:%s" % frame_id)
+            error_msg = "ReadOnly/Unofficial Frame-ID:%s" % frame_id
             raise Exception(1, error_msg)
         return encoded_data
 
