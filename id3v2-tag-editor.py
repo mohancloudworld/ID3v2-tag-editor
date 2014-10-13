@@ -39,127 +39,127 @@ class TagEditorID3v2Major3(object):
         self.logger = logger
 
         # Supported "Encoding Byte":"Encoding Types"
-        self.encoding_types_dict = {\
-            '\x00'  : 'ascii', # $00 - ISO-8859-1 (ASCII).\
-            '\x01'  : 'utf-16' # $01 - UCS-2 in ID3v2.2 and ID3v2.3, UTF-16 encoded Unicode with BOM.\
+        self.encoding_types_dict = {
+            '\x00'  : 'ascii', # $00 - ISO-8859-1 (ASCII).
+            '\x01'  : 'utf-16' # $01 - UCS-2 in ID3v2.2 and ID3v2.3, UTF-16 encoded Unicode with BOM.
         }
         # Supported "Encoding Types":"String Terminator"
-        self.string_terminators_dict = {\
-            'ascii'     : '\x00',       # $00 - ISO-8859-1 (ASCII)\
-            'utf-16'    : '\x00'+'\x00' # $00 00 - UTF-16 \
+        self.string_terminators_dict = {
+            'ascii'     : '\x00',       # $00 - ISO-8859-1 (ASCII)
+            'utf-16'    : '\x00'+'\x00' # $00 00 - UTF-16
         }
         # Declared/Supported Frames
-        self.declared_frames_dict = {\
-            'AENC'  : 'Audio encryption',\
-            'APIC'  : 'Attached picture',\
-            'COMM'  : 'Comments',\
-            'COMR'  : 'Commercial frame',\
-            'ENCR'  : 'Encryption method registration',\
-            'EQUA'  : 'Equalization',\
-            'ETCO'  : 'Event timing codes',\
-            'GEOB'  : 'General encapsulated object',\
-            'GRID'  : 'Group identification registration',\
-            'IPLS'  : 'Involved people list',\
-            'LINK'  : 'Linked information',\
-            'MCDI'  : 'Music CD identifier',\
-            'MLLT'  : 'MPEG location lookup table',\
-            'OWNE'  : 'Ownership frame',\
-            'PRIV'  : 'Private frame',\
-            'PCNT'  : 'Play counter',\
-            'POPM'  : 'Popularimeter',\
-            'POSS'  : 'Position synchronisation frame',\
-            'RBUF'  : 'Recommended buffer size',\
-            'RVAD'  : 'Relative volume adjustment',\
-            'RVRB'  : 'Reverb',\
-            'SYLT'  : 'Synchronized lyric/text',\
-            'SYTC'  : 'Synchronized tempo codes',\
-            'TALB'  : 'Album/Movie/Show title',\
-            'TBPM'  : 'BPM (beats per minute)',\
-            'TCOM'  : 'Composer',\
-            'TCON'  : 'Content type',\
-            'TCOP'  : 'Copyright message',\
-            'TDAT'  : 'Date',\
-            'TDLY'  : 'Playlist delay',\
-            'TENC'  : 'Encoded by',\
+        self.declared_frames_dict = {
+            'AENC'  : 'Audio encryption',
+            'APIC'  : 'Attached picture',
+            'COMM'  : 'Comments',
+            'COMR'  : 'Commercial frame',
+            'ENCR'  : 'Encryption method registration',
+            'EQUA'  : 'Equalization',
+            'ETCO'  : 'Event timing codes',
+            'GEOB'  : 'General encapsulated object',
+            'GRID'  : 'Group identification registration',
+            'IPLS'  : 'Involved people list',
+            'LINK'  : 'Linked information',
+            'MCDI'  : 'Music CD identifier',
+            'MLLT'  : 'MPEG location lookup table',
+            'OWNE'  : 'Ownership frame',
+            'PRIV'  : 'Private frame',
+            'PCNT'  : 'Play counter',
+            'POPM'  : 'Popularimeter',
+            'POSS'  : 'Position synchronisation frame',
+            'RBUF'  : 'Recommended buffer size',
+            'RVAD'  : 'Relative volume adjustment',
+            'RVRB'  : 'Reverb',
+            'SYLT'  : 'Synchronized lyric/text',
+            'SYTC'  : 'Synchronized tempo codes',
+            'TALB'  : 'Album/Movie/Show title',
+            'TBPM'  : 'BPM (beats per minute)',
+            'TCOM'  : 'Composer',
+            'TCON'  : 'Content type',
+            'TCOP'  : 'Copyright message',
+            'TDAT'  : 'Date',
+            'TDLY'  : 'Playlist delay',
+            'TENC'  : 'Encoded by',
             'TEXT'  : 'Lyricist/Text writer',
-            'TFLT'  : 'File type',\
-            'TIME'  : 'Time',\
-            'TIT1'  : 'Content group description',\
-            'TIT2'  : 'Title/songname/content description',\
-            'TIT3'  : 'Subtitle/Description refinement',\
-            'TKEY'  : 'Initial key',\
-            'TLAN'  : 'Language(s)',\
-            'TLEN'  : 'Length',\
-            'TMED'  : 'Media type',\
-            'TOAL'  : 'Original album/movie/show title',\
-            'TOFN'  : 'Original filename',\
-            'TOLY'  : 'Original lyricist(s)/text writer(s)',\
-            'TOPE'  : 'Original artist(s)/performer(s)',\
-            'TORY'  : 'Original release year',\
-            'TOWN'  : 'File owner/licensee',\
-            'TPE1'  : 'Lead performer(s)/Soloist(s)',\
-            'TPE2'  : 'Band/orchestra/accompaniment',\
-            'TPE3'  : 'Conductor/performer refinement',\
-            'TPE4'  : 'Interpreted, remixed, or otherwise modified by',\
-            'TPOS'  : 'Part of a set',\
-            'TPUB'  : 'Publisher',\
-            'TRCK'  : 'Track number/Position in set',\
-            'TRDA'  : 'Recording dates',\
-            'TRSN'  : 'Internet radio station name',\
-            'TRSO'  : 'Internet radio station owner',\
-            'TSIZ'  : 'Size',\
-            'TSRC'  : 'ISRC (international standard recording code)',\
-            'TSSE'  : 'Software/Hardware and settings used for encoding',\
-            'TYER'  : 'Year',\
-            'TXXX'  : 'User defined text information frame',\
-            'UFID'  : 'Unique file identifier',\
-            'USER'  : 'Terms of use',\
-            'USLT'  : 'Unsychronized lyric/text transcription',\
-            'WCOM'  : 'Commercial information',\
-            'WCOP'  : 'Copyright/Legal information',\
-            'WOAF'  : 'Official audio file webpage',\
-            'WOAR'  : 'Official artist/performer webpage',\
-            'WOAS'  : 'Official audio source webpage',\
-            'WORS'  : 'Official internet radio station homepage',\
-            'WPAY'  : 'Payment',\
-            'WPUB'  : 'Publishers official webpage',\
+            'TFLT'  : 'File type',
+            'TIME'  : 'Time',
+            'TIT1'  : 'Content group description',
+            'TIT2'  : 'Title/songname/content description',
+            'TIT3'  : 'Subtitle/Description refinement',
+            'TKEY'  : 'Initial key',
+            'TLAN'  : 'Language(s)',
+            'TLEN'  : 'Length',
+            'TMED'  : 'Media type',
+            'TOAL'  : 'Original album/movie/show title',
+            'TOFN'  : 'Original filename',
+            'TOLY'  : 'Original lyricist(s)/text writer(s)',
+            'TOPE'  : 'Original artist(s)/performer(s)',
+            'TORY'  : 'Original release year',
+            'TOWN'  : 'File owner/licensee',
+            'TPE1'  : 'Lead performer(s)/Soloist(s)',
+            'TPE2'  : 'Band/orchestra/accompaniment',
+            'TPE3'  : 'Conductor/performer refinement',
+            'TPE4'  : 'Interpreted, remixed, or otherwise modified by',
+            'TPOS'  : 'Part of a set',
+            'TPUB'  : 'Publisher',
+            'TRCK'  : 'Track number/Position in set',
+            'TRDA'  : 'Recording dates',
+            'TRSN'  : 'Internet radio station name',
+            'TRSO'  : 'Internet radio station owner',
+            'TSIZ'  : 'Size',
+            'TSRC'  : 'ISRC (international standard recording code)',
+            'TSSE'  : 'Software/Hardware and settings used for encoding',
+            'TYER'  : 'Year',
+            'TXXX'  : 'User defined text information frame',
+            'UFID'  : 'Unique file identifier',
+            'USER'  : 'Terms of use',
+            'USLT'  : 'Unsychronized lyric/text transcription',
+            'WCOM'  : 'Commercial information',
+            'WCOP'  : 'Copyright/Legal information',
+            'WOAF'  : 'Official audio file webpage',
+            'WOAR'  : 'Official artist/performer webpage',
+            'WOAS'  : 'Official audio source webpage',
+            'WORS'  : 'Official internet radio station homepage',
+            'WPAY'  : 'Payment',
+            'WPUB'  : 'Publishers official webpage',
             'WXXX'  : 'User defined URL link frame'
         }
 
         # Supported picture types in 'APIC' frames
-        self.picture_types_dict = {\
-            0x00    : 'Other',\
-            0x01    : '32x32 pixels \'file icon\' (PNG only)',\
-            0x02    : 'Other file icon',\
-            0x03    : 'Cover (front)',\
-            0x04    : 'Cover (back)',\
-            0x05    : 'Leaflet page',\
-            0x06    : 'Media (e.g. label side of CD)',\
-            0x07    : 'Lead artist/lead performer/soloist',\
-            0x08    : 'Artist/performer',\
-            0x09    : 'Conductor',\
-            0x0A    : 'Band/Orchestra',\
-            0x0B    : 'Composer',\
-            0x0C    : 'Lyricist/text writer',\
-            0x0D    : 'Recording Location',\
-            0x0E    : 'During recording',\
-            0x0F    : 'During performance',\
-            0x10    : 'Movie/video screen capture',\
-            0x11    : 'A bright coloured fish',\
-            0x12    : 'Illustration',\
-            0x13    : 'Band/artist logotype',\
+        self.picture_types_dict = {
+            0x00    : 'Other',
+            0x01    : '32x32 pixels \'file icon\' (PNG only)',
+            0x02    : 'Other file icon',
+            0x03    : 'Cover (front)',
+            0x04    : 'Cover (back)',
+            0x05    : 'Leaflet page',
+            0x06    : 'Media (e.g. label side of CD)',
+            0x07    : 'Lead artist/lead performer/soloist',
+            0x08    : 'Artist/performer',
+            0x09    : 'Conductor',
+            0x0A    : 'Band/Orchestra',
+            0x0B    : 'Composer',
+            0x0C    : 'Lyricist/text writer',
+            0x0D    : 'Recording Location',
+            0x0E    : 'During recording',
+            0x0F    : 'During performance',
+            0x10    : 'Movie/video screen capture',
+            0x11    : 'A bright coloured fish',
+            0x12    : 'Illustration',
+            0x13    : 'Band/artist logotype',
             0x14    : 'Publisher/Studio logotype'
         }
 
         # Mapping 'option' to 'Frames', for adding/modifying Frames
-        self.write_opts_dict = {\
-            'artist'    : 'TPE1',\
-            'album'     : 'TALB',\
-            'title'     : 'TIT2',\
-            'comments'  : 'COMM',\
-            'genre'     : 'TCON',\
-            'year'      : 'TYER',\
-            'track'     : 'TRCK',\
+        self.write_opts_dict = {
+            'artist'    : 'TPE1',
+            'album'     : 'TALB',
+            'title'     : 'TIT2',
+            'comments'  : 'COMM',
+            'genre'     : 'TCON',
+            'year'      : 'TYER',
+            'track'     : 'TRCK',
             'picture'   : 'APIC'
         }
 
@@ -880,40 +880,40 @@ class TagEditorID3v2Major4(TagEditorID3v2Major3):
         self.default_encoding_type = 'utf-8' # choose from self.encoding_types_dict, used for creating/modifying Frames
 
         # added/updated: Supported "Encoding Byte":"Encoding Types"
-        self.encoding_types_updates_dict = {\
-            '\x02'  : 'utf-16-be', # $02 - UTF-16BE encoded Unicode without BOM in ID3v2.4 only.\
-            '\x03'  : 'utf-8'      # $03 - UTF-8 encoded Unicode in ID3v2.4 only.\
+        self.encoding_types_updates_dict = {
+            '\x02'  : 'utf-16-be', # $02 - UTF-16BE encoded Unicode without BOM in ID3v2.4 only.
+            '\x03'  : 'utf-8'      # $03 - UTF-8 encoded Unicode in ID3v2.4 only.
         }
         # Supported "Encoding Types":"String Terminator"
-        self.string_terminators_updates_dict = {\
-            'utf-16-be' : '\x00'+'\x00', # $00 00 - UTF-16-BE \
-            'utf-8'     : '\x00'         # $00 - UTF-8 \
+        self.string_terminators_updates_dict = {
+            'utf-16-be' : '\x00'+'\x00', # $00 00 - UTF-16-BE
+            'utf-8'     : '\x00'         # $00 - UTF-8
         }
 
         # added/updated: Declared/Supported Frames
-        self.declared_frames_updates_dict = {\
-            'ASPI'  : 'Audio seek point index',\
-            'EQU2'  : 'Equalisation (2)',\
-            'RVA2'  : 'Relative volume adjustment (2)',\
-            'SEEK'  : 'Seek frame',\
-            'SIGN'  : 'Signature frame',\
-            'TDEN'  : 'Encoding time',\
-            'TDOR'  : 'Original release time',\
-            'TDRC'  : 'Recording time',\
-            'TDRL'  : 'Release time',\
-            'TDTG'  : 'Tagging time',\
-            'TIPL'  : 'Involved people list',\
-            'TMCL'  : 'Musician credits list',\
-            'TMOO'  : 'Mood',\
-            'TPRO'  : 'Produced notice',\
-            'TSOA'  : 'Album sort order',\
-            'TSOP'  : 'Performer sort order',\
-            'TSOT'  : 'Title sort order',\
+        self.declared_frames_updates_dict = {
+            'ASPI'  : 'Audio seek point index',
+            'EQU2'  : 'Equalisation (2)',
+            'RVA2'  : 'Relative volume adjustment (2)',
+            'SEEK'  : 'Seek frame',
+            'SIGN'  : 'Signature frame',
+            'TDEN'  : 'Encoding time',
+            'TDOR'  : 'Original release time',
+            'TDRC'  : 'Recording time',
+            'TDRL'  : 'Release time',
+            'TDTG'  : 'Tagging time',
+            'TIPL'  : 'Involved people list',
+            'TMCL'  : 'Musician credits list',
+            'TMOO'  : 'Mood',
+            'TPRO'  : 'Produced notice',
+            'TSOA'  : 'Album sort order',
+            'TSOP'  : 'Performer sort order',
+            'TSOT'  : 'Title sort order',
             'TSST'  : 'Set subtitle'
         }
 
         # added/updated: mapping 'option' to 'Frames', for adding/modifying Frames
-        self.write_opts_updates_dict = {\
+        self.write_opts_updates_dict = {
             'year'  : 'TDRC'
         }
 
@@ -964,12 +964,12 @@ class TagEditorID3v2(object):
         group3.add_argument('-t', '--title')
         group3.add_argument('-A', '--album')
         group3.add_argument('-a', '--artist')
-        group3.add_argument('-c', '--comments', metavar='COMMENTS_INFO', \
+        group3.add_argument('-c', '--comments', metavar='COMMENTS_INFO',
                         help='COMMENTS_INFO = <comments>[,<short content descrip.>]')
         group3.add_argument('-g', '--genre')
         group3.add_argument('-y', '--year')
         group3.add_argument('-T', '--track')
-        group3.add_argument('-P', '--picture', metavar='ALBUM_ART_INFO', \
+        group3.add_argument('-P', '--picture', metavar='ALBUM_ART_INFO',
                         help='ALBUM_ART_INFO = <image-file>[,<picture-type-integer>[,<description>]]')
 
         group4 = parser.add_argument_group('to interactively edit Frames')
