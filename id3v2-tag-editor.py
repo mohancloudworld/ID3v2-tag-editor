@@ -123,13 +123,7 @@ class TagEditorID3v2Major3(object):
             'WORS'  : 'Official internet radio station homepage',\
             'WPAY'  : 'Payment',\
             'WPUB'  : 'Publishers official webpage',\
-            'WXXX'  : 'User defined URL link frame',\
-            \
-            \
-            \
-            'TCMP'  : '(Unofficial) iTunes Compilation Flag',\
-            'TSO2'  : '(Unofficial) iTunes uses this for Album Artist sort order',\
-            'TSTU'  : '(Unofficial) Unknown',\
+            'WXXX'  : 'User defined URL link frame'
         }
 
         # Supported picture types in 'APIC' frames
@@ -241,23 +235,22 @@ class TagEditorID3v2Major3(object):
 
     def decodeFrame(self, data):
         frame_id = data[0:0+4]
+        sz = self.decodeFrameSize(data[4:4+4])
+        frame_header_flags = (ord(data[8]) << 8) + ord(data[9])
+        frame_header_sz = self.frame_header_sz
+        data = data[frame_header_sz:frame_header_sz+sz]
         if self.declared_frames_dict.has_key(frame_id):
-            sz = self.decodeFrameSize(data[4:4+4])
-            frame_header_flags = (ord(data[8]) << 8) + ord(data[9])
-            frame_header_sz = self.frame_header_sz
-            data = data[frame_header_sz:frame_header_sz+sz]
             if self.logger.isEnabledFor(logging.INFO):
                 self.logger.info("\nFrame ID:\t\t%s (%s)" % (frame_id, self.declared_frames_dict[frame_id]))
-                self.logger.info("Size:\t\t\t%d" % sz)
-                self.logger.info("Flags:\t\t\t0x%0.4x" % frame_header_flags)
             else:
                 self.logger.warning("\n%s:" % (self.declared_frames_dict[frame_id]))
-        else:
-            self.logger.error("Unknown Frame ID:\t\t%s" % frame_id)
-            sz = None
-            frame_header_flags = None
-            data = None
-            frame_header_sz = None
+        else: # Unknown Frame ID
+            if self.logger.isEnabledFor(logging.INFO):
+                self.logger.info("\nFrame ID:\t\t%s (%s)" % (frame_id, "Unknown Frame ID"))
+            else:
+                self.logger.warning("\n%s (%s):" % (frame_id, "Unknown Frame ID"))
+        self.logger.info("Size:\t\t\t%d" % sz)
+        self.logger.info("Flags:\t\t\t0x%0.4x" % frame_header_flags)
         return [frame_id, sz, frame_header_flags, data]
 
     def hasDataLengthIndicator(self, frame_header_flags):
@@ -519,7 +512,7 @@ class TagEditorID3v2Major3(object):
             self.logger.warning("Data:\t\t\t%s" % data)
         else: # Unknown TAG
             data = "<Not Decoded> Unknown TAG"
-            self.logger.warning("Data:\t\t\t", data)
+            self.logger.warning("Data:\t\t\t%s", data)
 
     def isTextInfoFrame(self, frame_id): # Text information frames
         if  (self.declared_frames_dict.has_key(frame_id)) and (frame_id[0] == "T") and (frame_id != "TXXX"):
